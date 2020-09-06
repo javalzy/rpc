@@ -154,6 +154,6 @@ UDPTransceiver.prototype.close = function () {
 
     this._socket.close();
 
-    //原来的地址已经失效，现在清空，下次调用接口时重新获取---
+    //原来的地址已经失效，现在清空，下次调用接口时重新获取
     this._localEndpoint = undefined;
 };
