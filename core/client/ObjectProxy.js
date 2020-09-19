@@ -35,7 +35,8 @@ var ObjectProxy = function () {
     this._bSyncInvokeFinish = false;        //在进程间同步调用完成的消息，在流量较小的时候加快触发屏蔽逻辑
     this._bRetryOnDestroy   = false;        //节点销毁时是否将发送失败的调用返还队列
     this._checkTimeoutInfo  = new CheckTimeoutInfo();
-    this._iTransPoolSize     = 1;            //adapter中远端连接池大小
+    this._iTransPoolSize    = 1;            //adapter中远端连接池大小
+    this._isWebSocket       = false;        //是否WebSocket
 };
 module.exports.ObjectProxy = ObjectProxy;
 
@@ -55,11 +56,15 @@ ObjectProxy.prototype.__defineSetter__("name", function (value) { this._objname 
 ObjectProxy.prototype.__defineGetter__("pTimeoutQueue", function () { return this._pTimeoutQueue; });
 ObjectProxy.prototype.__defineSetter__("pTimeoutQueue", function (value) { this._pTimeoutQueue = value; });
 
+ObjectProxy.prototype.__defineGetter__("isWebSocket", function () { return this._isWebSocket; });
+
 //初始化ObjectProxy
 ObjectProxy.prototype.initialize = function ($ObjName, $SetName, options) {
     options = options || {};
     if(options.hasOwnProperty("bRetryOnDestroy")) this._bRetryOnDestroy = options.bRetryOnDestroy;
     if(options.hasOwnProperty("iTransPoolSize")) this._iTransPoolSize = options.iTransPoolSize;
+    if(options.hasOwnProperty("isWebSocket")) this._isWebSocket = options.isWebSocket;
+
     assert(typeof this._iTransPoolSize === "number" && this._iTransPoolSize > 0, "trans pool size must be > 1 number");
 
     this._manager = new EndpointManager(this, this._comm, $ObjName, $SetName, options);

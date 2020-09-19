@@ -9,6 +9,7 @@ var RpcCallError   = require("../util/RpcCallError.js").RpcCallError;
 var TQueue         = require("../util/TQueue.js").TQueue;
 var TCPTransceiver = require("./Transceiver.js").TCPTransceiver;
 var UDPTransceiver = require("./Transceiver.js").UDPTransceiver;
+var WSTransceiver = require("./Transceiver.js").WSTransceiver;
 
 /**
  * 超时一定比率后进行切换
@@ -69,7 +70,11 @@ AdapterProxy.prototype.initialize = function () {
     assert(this._endpoint.sProtocol === "tcp" || this._endpoint.sProtocol === "udp", "trans protocol must be tcp or udp");
     for(var i=0; i< this._worker._iTransPoolSize;i++){
         if (this._endpoint.sProtocol === "tcp") {
-            this._vTrans[i] = new TCPTransceiver(this, this._endpoint);
+            if(this.worker.isWebSocket){
+                this._vTrans[i] = new WSTransceiver(this, this._endpoint);
+            }else{
+                this._vTrans[i] = new TCPTransceiver(this, this._endpoint);
+            }
         } else {
             this._vTrans[i] = new UDPTransceiver(this, this._endpoint);
         }

@@ -1,16 +1,102 @@
 /**
  * 客户端网络传输类
  */
-var net      = require("net");
-var dgram    = require("dgram");
+var net = require("net");
+var dgram = require("dgram");
 var Endpoint = require("@tars/utils").Endpoint;
 
 var Transceiver = function () {
 
 };
 Transceiver.ES_UNCONNECTED = 1;  //没有连接
-Transceiver.ES_CONNECTING  = 2;  //正在连接中
-Transceiver.ES_CONNECTED   = 3;  //已经连接上
+Transceiver.ES_CONNECTING = 2;  //正在连接中
+Transceiver.ES_CONNECTED = 3;  //已经连接上
+
+/////////////////////////////////////////////WebSocket协议套接口类////////////////////////////////////////////////////////////
+var WSTransceiver = function ($adapter, $endpoint) {
+    this._adapter = $adapter;
+    this._endpoint = $endpoint;
+
+    this._stream = undefined; //协议解析器的实例
+    this._socket = undefined;
+    this._status = Transceiver.ES_UNCONNECTED;
+    this._localEndpoint = undefined;
+    this._socket_evt = undefined;
+};
+module.exports.WSTransceiver = WSTransceiver;
+
+//定义TCP接口的属性
+//当socket存在，并且处于已连接状态时，才去获取本地端口
+WSTransceiver.prototype.__defineGetter__("LocalEndpoint", function () {
+    if (this._localEndpoint === undefined && this._socket && this._status == Transceiver.ES_CONNECTED) {
+        this._localEndpoint = new Endpoint();
+        this._localEndpoint.sProtocol = "tcp";
+        this._localEndpoint.sHost = this._socket.localAddress;
+        this._localEndpoint.iPort = this._socket.localPort;
+    }
+    return this._localEndpoint;
+});
+
+//重新连接
+WSTransceiver.prototype.reconnect = function () {
+    var self = this;
+
+    self._stream = new self._adapter._worker._protocol();
+    //设置协议类型，feed的时候需要区分tars和tup编码
+    self._stream._version = self._adapter._worker.version || 1;
+    self._socket = new WebSocket(`ws://${self._endpoint.sHost}:${self._endpoint.iPort}`);
+    self._status = Transceiver.ES_CONNECTING;
+    self._socket_evt = {
+        connect: function () { self._status = Transceiver.ES_CONNECTED; self._adapter.doInvoke(); },
+        close: function () { self.close(); },
+        error: function () { self.close(); },
+        data: function (data) { self._stream.feed(data); }
+    };
+    self._socket.onopen = self._socket_evt.connect;
+    self._socket.onclose = self._socket_evt.close;
+    self._socket.onerror = self._socket_evt.error;
+    self._socket.onmessage = self._socket_evt.data;
+
+    self._stream.on("message", function ($protoMessage) { self._adapter.doResponse($protoMessage); });
+};
+
+//发送未经编码的请求
+WSTransceiver.prototype.sendRequest = function ($protoMessage) {
+    if ($protoMessage && this._endpoint && this._endpoint.setId) {
+        $protoMessage.setId = this._endpoint.setId;
+    }
+
+    if (this._status === Transceiver.ES_CONNECTED) {
+        this._socket.send(this._stream.compose($protoMessage));
+        return true;
+    }
+
+    return false;
+};
+
+WSTransceiver.prototype.hasConnected = function () { return this._status === Transceiver.ES_CONNECTED; };
+WSTransceiver.prototype.isConnecting = function () { return this._status === Transceiver.ES_CONNECTING; };
+WSTransceiver.prototype.isValid = function () { return this._status !== Transceiver.ES_UNCONNECTED; };
+
+//关闭当前网络套接字
+WSTransceiver.prototype.close = function () {
+    this._status = Transceiver.ES_UNCONNECTED;
+    this._stream = undefined;
+
+    if (this._socket) {
+        self._socket.onopen = self._socket_evt.connect;
+        self._socket.onclose = self._socket_evt.close;
+        self._socket.onerror = self._socket_evt.error;
+        self._socket.onmessage = self._socket_evt.data;
+
+        this._socket.destroy();
+        this._socket = undefined;
+    }
+
+    //原来的地址已经失效，现在清空，下次调用接口时重新获取
+    this._localEndpoint = undefined;
+};
+
 
 /////////////////////////////////////////////TCP协议套接口类////////////////////////////////////////////////////////////
 var TCPTransceiver = function ($adapter, $endpoint) {
@@ -91,6 +177,7 @@ TCPTransceiver.prototype.close = function () {
         this._socket.removeListener("error", this._socket_evt.error);
         this._socket.removeListener("close", this._socket_evt.close);
         this._socket.removeListener("data", this._socket_evt.data);
+
         this._socket.destroy();
         this._socket = undefined;
     }
@@ -130,7 +217,7 @@ UDPTransceiver.prototype.reconnect = function () {
     //设置协议类型，feed的时候需要区分tars和tup编码
     self._stream._version = self._adapter._worker.version || 1;
     self._socket = dgram.createSocket("udp4");
-    self._socket.on("message", function ($msg) { self._stream.reset(); self._stream.feed($msg);    });
+    self._socket.on("message", function ($msg) { self._stream.reset(); self._stream.feed($msg); });
     self._stream.on("message", function ($protoMessage) { self._adapter.doResponse($protoMessage); });
     self._status = Transceiver.ES_CONNECTED;
 };
