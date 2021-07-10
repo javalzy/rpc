@@ -17,13 +17,13 @@
     "proxy",
     "server"
   ],
-  "homepage": "https://github.com/javalzy/rpc",
+  "homepage": "https://github.com/tars-node/rpc",
   "bugs": {
-    "url": "https://github.com/javalzy/rpc/issues"
+    "url": "https://github.com/tars-node/rpc/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/javalzy/rpc.git"
+    "url": "https://github.com/tars-node/rpc.git"
   },
   "dependencies": {
     "@tars/dyeing": "^2.0.0",
